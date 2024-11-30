@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: testdb
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+      redis:
+        image: redis:latest
+        ports:
+          - 6379:6379
+
+    steps:
+    # 1. Checkout 코드
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    # 2. Node.js 환경 설정
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: 20
+        cache: 'npm'
+
+    # 3. FE 및 BE Docker 이미지 빌드
+    - name: Build Docker image for backend
+      run: |
+        docker build -t donggle0315/ci-test ./back
+    # - name: Build Docker image for frontend
+    #   run: |
+    #     docker build -t your-dockerhub-username/frontend ./FE
+
+    # 4. 컨테이너 실행 및 확인
+    - name: Run backend container
+      run: |
+        docker run -d --name backend-container -p 8080:8080 donggle0315/ci-test
+    # - name: Run frontend container
+    #   run: |
+    #     docker run -d --name frontend-container -p 3001:3001 your-dockerhub-username/frontend
+
+    # 5. Docker Hub에 이미지 푸시
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: Push backend image to Docker Hub
+      run: |
+        docker push donggle0315/ci-test
+    
